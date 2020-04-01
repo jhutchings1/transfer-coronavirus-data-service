@@ -95,9 +95,21 @@ def exchange_code_for_tokens(code, code_verifier=None) -> dict:
     response = client.get_user(AccessToken=oauth_response_body["access_token"])
 
     session["attributes"] = response["UserAttributes"]
+    email = return_attribute("email")
     session["user"] = response["Username"]
-    session["email"] = return_attribute(session, "email")
+    session["email"] = email
     session["details"] = id_token
+
+    grps = []
+    if os.getenv("ADMIN", "false") == "true":
+        grps = cognito.get_user_groups(email)
+    if "TestGroup" in grps:
+        session["is_admin"] = True
+    else:
+        session["is_admin"] = False
+    session["groups"] = grps
+
+    print("grps", grps)
 
     app.logger.info(
         "Successful login - user: %s email: %s", session["user"], session["email"]
@@ -180,9 +192,6 @@ def server_error_400(e):
 @app.route("/index")
 def index():
 
-    if os.getenv("ADMIN", "false") == "true":
-        return redirect("/admin")
-
     args = request.args
 
     if "code" in args:
@@ -191,23 +200,33 @@ def index():
         response = exchange_code_for_tokens(oauth_code)
         if response.status_code != 200:
             app.logger.error({"error": "OAuth failed", "response": response})
-        return redirect("/")
+        else:
+            return redirect("/start")
 
-    if "details" in session:
+    login_url = (
+        f"https://{app.cognito_domain}/oauth2/authorize?"
+        f"client_id={app.client_id}&"
+        "response_type=code&"
+        f"redirect_uri={app.redirect_host}&"
+        "scope=profile+email+phone+openid+aws.cognito.signin.user.admin"
+    )
+    return render_template_custom(app, "login.html", login_url=login_url)
+
+
+@app.route("/start")
+@login_required
+def start():
+    if session["is_admin"]:
+        return render_template_custom(
+            app, "admin/index.html", user=session["user"], email=session["email"]
+        )
+    else:
         app.logger.debug("Logged in")
         return render_template_custom(
             app, "welcome.html", user=session["user"], email=session["email"]
         )
-    else:
-        app.logger.debug("Logged out")
-        login_url = (
-            f"https://{app.cognito_domain}/oauth2/authorize?"
-            f"client_id={app.client_id}&"
-            "response_type=code&"
-            f"redirect_uri={app.redirect_host}&"
-            "scope=profile+email+phone+openid+aws.cognito.signin.user.admin"
-        )
-        return render_template_custom(app, "login.html", login_url=login_url)
+
+
 
 
 @app.route("/logout")
@@ -218,6 +237,8 @@ def logout():
         session.pop("email", None)
         session.pop("user", None)
         session.pop("attributes", None)
+        session.pop("groups", None)
+        session.pop("is_admin", None)
     except Exception as err:
         app.logger.error(err)
 
@@ -258,16 +279,11 @@ def download():
 @app.route("/files")
 @login_required
 def files():
-    if "details" in session and "attributes" in session:
-        files = get_files(app.bucket_name, session)
-
-        # TODO sorting
-
-        return render_template_custom(
-            app, "files.html", user=session["user"], email=session["email"], files=files
-        )
-    else:
-        return redirect("/")
+    files = get_files(app.bucket_name, session)
+    # TODO sorting
+    return render_template_custom(
+        app, "files.html", user=session["user"], email=session["email"], files=files
+    )
 
 
 # ----------- ADMIN ROUTES -----------
@@ -388,7 +404,7 @@ def get_files(bucket_name: str, user_session: dict):
     return resp
 
 
-def return_attribute(session: dict, get_attribute: str) -> str:
+def return_attribute(get_attribute: str) -> str:
     if "attributes" in session:
         for attribute in session["attributes"]:
             if "Name" in attribute:
@@ -400,9 +416,9 @@ def return_attribute(session: dict, get_attribute: str) -> str:
 def load_user_lookup(session):
     paths = []
 
-    # user_is_local_authority = return_attribute(session, "custom:is_la") == "1"
+    # user_is_local_authority = return_attribute("custom:is_la") == "1"
     app_authorised_paths = [os.getenv("BUCKET_MAIN_PREFIX", "web-app-prod-data")]
-    user_authorised_paths = return_attribute(session, "custom:paths")
+    user_authorised_paths = return_attribute("custom:paths")
 
     user_key_prefixes = user_authorised_paths.split(";")
     for key_prefix in user_key_prefixes:

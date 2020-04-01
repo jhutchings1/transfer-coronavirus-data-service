@@ -89,6 +89,20 @@
 
     <main class="govuk-main-wrapper govuk-body" id="main-content" role="main">
       <h1 class="govuk-heading-xl">{{ title }}</h1>
+
+      {% if logged_in %}
+      <p>
+        You're currently logged in as {{ session["email"] }}.
+      </p>
+      <p>
+        <a href="/logout">
+          <button class="govuk-button govuk-button--secondary" data-module="govuk-button" title="Logout">
+            Logout
+          </button>
+        </a>
+      </p>
+      {% endif %}
+
       {% block content %}{% endblock %}
     </main>
   </div>

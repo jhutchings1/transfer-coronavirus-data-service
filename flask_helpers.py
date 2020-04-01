@@ -41,4 +41,6 @@ def render_template_custom(app, template, **args):
         page_title = "{} - {}".format(app.cf_space.upper(), page_title)
     args["title"] = page_title
 
+    args["logged_in"] = "details" in session
+
     return render_template(template, **args)
