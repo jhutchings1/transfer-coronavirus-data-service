@@ -56,6 +56,19 @@
   </div>
   <div class="govuk-summary-list__row">
     <dt class="govuk-summary-list__key">
+      User group
+    </dt>
+    <dd class="govuk-summary-list__value">
+      {% if user["groups"]|length == 0 %}
+        <p class="govuk-body">Standard data access</p>
+      {% endif %}
+      {% for group in user["groups"] %}
+        <p class="govuk-body">{{ group }}</p>
+      {% endfor %}
+    </dd>
+  </div>
+  <div class="govuk-summary-list__row">
+    <dt class="govuk-summary-list__key">
       Local authority user?
     </dt>
     <dd class="govuk-summary-list__value">

@@ -182,13 +182,12 @@ def get_user_groups(username: str) -> dict:
     response = client.admin_list_groups_for_user(
         Username=username, UserPoolId=get_env_pool_id(), Limit=10
     )
-    print("get_user_groups", response)
+
     if "Groups" in response:
         for grp in response["Groups"]:
             if "GroupName" in grp:
                 grps.append(grp["GroupName"])
 
-    print("get_user_groups", grps)
     return grps
 
 
@@ -207,8 +206,10 @@ def normalise_user(aws_user_resp):
         ]:
             res[attr["Name"]] = attr["Value"]
 
+    grps = []
     if "username" in res:
-        get_user_groups(res["username"])
+        grps = get_user_groups(res["username"])
+    res["groups"] = grps
 
     return res
 
