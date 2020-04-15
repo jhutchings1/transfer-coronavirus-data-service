@@ -145,7 +145,9 @@ def sanitise_email(email_address):
             raise CognitoException(
                 type="BadEmailWhitelist", msg="failed for '{}'".format(email_address)
             )
-    raise CognitoException(type="BadEmail")
+    raise CognitoException(
+        type="BadEmail", msg="not a valid email for '{}'".format(email_address)
+    )
 
 
 def sanitise_phone(phone_number):
